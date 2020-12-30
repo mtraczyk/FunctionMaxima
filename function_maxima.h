@@ -14,7 +14,7 @@ public:
     FunctionMaxima() = default;
 
 private:
-    PointType create_point();
+    PointType create_point(const A &arg, const V &val);
 
     std::set<point_type> function_points;
     std::set<point_type> local_maxima;
@@ -103,7 +103,8 @@ V const &FunctionMaxima<A, V>::PointType::val() const {
 }
 
 template<typename A, typename V>
-typename FunctionMaxima<A, V>::PointType create_point(const A &arg, const V &val) {
+typename FunctionMaxima<A, V>::PointType
+FunctionMaxima<A, V>::create_point(const A &arg, const V &val) {
     return FunctionMaxima<A, V>::PointType::PointType(arg, val);
 }
 

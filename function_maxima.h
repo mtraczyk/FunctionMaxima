@@ -31,11 +31,21 @@ public:
 
     using iterator = typename std::set<point_type, Comparator>::iterator;
 
-    iterator begin() const;
+    iterator begin() const noexcept;
 
-    iterator end() const;
+    iterator end() const noexcept;
 
     iterator find(A const &a) const;
+
+    using mx_iterator = iterator;
+
+    mx_iterator mx_begin() const noexcept;
+
+    mx_iterator mx_end() const noexcept;
+
+    using size_type = size_t;
+
+    size_type size() const noexcept;
 
     ~FunctionMaxima();
 
@@ -57,7 +67,7 @@ public:
 
     A const &arg() const noexcept;
 
-    V const &val() const noexcept;
+    V const &value() const noexcept;
 
     ~PointType();
 
@@ -66,8 +76,8 @@ private:
 
     friend PointType FunctionMaxima::create_point(const A &arg, const V &val);
 
-    std::shared_ptr<A> argument;
-    std::shared_ptr<V> value;
+    std::shared_ptr<A> point_argument;
+    std::shared_ptr<V> point_value;
 };
 
 template<typename A, typename V>
@@ -130,28 +140,28 @@ namespace {
 template<typename A, typename V>
 typename FunctionMaxima<A, V>::PointType &
 FunctionMaxima<A, V>::PointType::operator=(FunctionMaxima<A, V>::PointType other) noexcept {
-    argument.swap(other.arg());
-    value.swap(other.val());
+    point_argument.swap(other.arg());
+    point_value.swap(other.value());
 
     return *this;
 }
 
 template<typename A, typename V>
 FunctionMaxima<A, V>::PointType::PointType(const A &arg, const V &val) {
-    argument = std::make_shared<A>(A(arg));
-    Guard<A> point_construction_guard = Guard<A>(&argument);
-    value = std::make_shared<A>(V(val));
+    point_argument = std::make_shared<A>(A(arg));
+    Guard<A> point_construction_guard = Guard<A>(&point_argument);
+    point_value = std::make_shared<A>(V(val));
     point_construction_guard.done();
 }
 
 template<typename A, typename V>
 A const &FunctionMaxima<A, V>::PointType::arg() const noexcept {
-    return *argument.get();
+    return *point_argument.get();
 }
 
 template<typename A, typename V>
-V const &FunctionMaxima<A, V>::PointType::val() const noexcept {
-    return *value.get();
+V const &FunctionMaxima<A, V>::PointType::value() const noexcept {
+    return *point_value.get();
 }
 
 template<typename A, typename V>
@@ -162,8 +172,8 @@ FunctionMaxima<A, V>::create_point(const A &arg, const V &val) {
 
 template<typename A, typename V>
 FunctionMaxima<A, V>::PointType::~PointType() {
-    argument.reset();
-    value.reset();
+    point_argument.reset();
+    point_value.reset();
 }
 
 template<typename A, typename V>
@@ -182,7 +192,7 @@ FunctionMaxima<A, V> &FunctionMaxima<A, V>::operator=(FunctionMaxima<A, V> other
 
 template<typename A, typename V>
 V const &FunctionMaxima<A, V>::value_at(const A &a) const {
-    return function_points.find(a) != function_points.end() ? (*function_points.find(a)).val()
+    return function_points.find(a) != function_points.end() ? (*function_points.find(a)).value()
                                                             : throw InvalidArg();
 }
 
@@ -203,6 +213,36 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
 template<typename A, typename V>
 void FunctionMaxima<A, V>::erase(const A &a) {
     delete_point(a);
+}
+
+template<typename A, typename V>
+typename FunctionMaxima<A, V>::iterator FunctionMaxima<A, V>::begin() const noexcept {
+    return function_points.begin();
+}
+
+template<typename A, typename V>
+typename FunctionMaxima<A, V>::iterator FunctionMaxima<A, V>::end() const noexcept {
+    return function_points.end();
+}
+
+template<typename A, typename V>
+typename FunctionMaxima<A, V>::iterator FunctionMaxima<A, V>::find(const A &a) const {
+    return function_points.find(a);
+}
+
+template<typename A, typename V>
+typename FunctionMaxima<A, V>::mx_iterator FunctionMaxima<A, V>::mx_begin() const noexcept {
+    return local_maxima.begin();
+}
+
+template<typename A, typename V>
+typename FunctionMaxima<A, V>::mx_iterator FunctionMaxima<A, V>::mx_end() const noexcept {
+    return local_maxima.end();
+}
+
+template<typename A, typename V>
+typename FunctionMaxima<A, V>::size_type FunctionMaxima<A, V>::size() const noexcept {
+    return function_points.size();
 }
 
 #endif // FUNCTION_MAXIMA_H

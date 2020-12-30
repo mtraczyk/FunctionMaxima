@@ -22,6 +22,8 @@ public:
 
     V const &value_at(A const &a) const;
 
+    void set_value(A const &a, V const &v);
+
     ~FunctionMaxima();
 
 private:
@@ -29,8 +31,8 @@ private:
 
     class Comparator;
 
-    std::set<point_type, Comparator> function_points;
-    std::set<point_type, Comparator> local_maxima;
+    std::set<std::shared_ptr<point_type>, Comparator> function_points;
+    std::set<std::shared_ptr<point_type>, Comparator> local_maxima;
 };
 
 template<typename A, typename V>
@@ -60,17 +62,18 @@ class FunctionMaxima<A, V>::Comparator {
 public:
     using is_transparent = std::true_type;
 
-    bool operator()(const typename FunctionMaxima<A, V>::PointType &lk, const A &fk) const {
-        return lk.arg() < fk;
+    bool operator()(const std::shared_ptr<FunctionMaxima<A, V>::PointType> &lk,
+                    const A &fk) const {
+        return (*lk).arg() < fk;
     }
 
-    bool operator()(const A &fk, const typename FunctionMaxima<A, V>::PointType &lk) const {
-        return fk < lk.arg();
+    bool operator()(const A &fk, const std::shared_ptr<FunctionMaxima<A, V>::PointType> &lk) const {
+        return fk < (*lk).arg();
     }
 
-    bool operator()(const typename FunctionMaxima<A, V>::PointType &fk,
-                    const typename FunctionMaxima<A, V>::PointType &lk) const {
-        return fk.arg() < lk.arg();
+    bool operator()(const std::shared_ptr<FunctionMaxima<A, V>::PointType> &fk,
+                    const std::shared_ptr<FunctionMaxima<A, V>::PointType> &lk) const {
+        return (*fk).arg() < (*lk).arg();
     }
 };
 
@@ -123,9 +126,9 @@ FunctionMaxima<A, V>::PointType::operator=(FunctionMaxima<A, V>::PointType other
 template<typename A, typename V>
 FunctionMaxima<A, V>::PointType::PointType(const A &arg, const V &val) {
     try {
-        argument = std::make_shared<A>(new A(arg));
+        argument = std::make_shared<A>(A(arg));
         Guard<A> point_construction_guard = Guard<A>(&argument);
-        value = std::make_shared<A>(new V(val));
+        value = std::make_shared<A>(V(val));
         point_construction_guard.done();
     } catch (...) {
         throw;
@@ -145,7 +148,7 @@ V const &FunctionMaxima<A, V>::PointType::val() const noexcept {
 template<typename A, typename V>
 typename FunctionMaxima<A, V>::PointType
 FunctionMaxima<A, V>::create_point(const A &arg, const V &val) {
-    return FunctionMaxima<A, V>::PointType::PointType(arg, val);
+    return typename FunctionMaxima<A, V>::PointType::PointType(arg, val);
 }
 
 template<typename A, typename V>
@@ -170,8 +173,16 @@ FunctionMaxima<A, V> &FunctionMaxima<A, V>::operator=(FunctionMaxima<A, V> other
 
 template<typename A, typename V>
 V const &FunctionMaxima<A, V>::value_at(const A &a) const {
-    return function_points.find(a) != function_points.end() ? (*function_points.find(a)).val()
+    return function_points.find(a) != function_points.end() ? (**function_points.find(a)).val()
                                                             : throw InvalidArg();
+}
+
+template<typename A, typename V>
+void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
+    function_points.erase(function_points.find(a));
+    std::shared_ptr<point_type> aux = std::make_shared<point_type>(
+            FunctionMaxima<A, V>::point_type(create_point(a, v)));
+    function_points.insert(aux);
 }
 
 #endif // FUNCTION_MAXIMA_H

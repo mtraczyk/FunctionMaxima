@@ -10,7 +10,11 @@
 template<typename A, typename V>
 class FunctionMaxima {
 private:
-    class Comparator;
+    class FunctionPointsComparator;
+
+    class LocalMaximaComparator;
+
+    class PointInsertionGuard;
 
 public:
     class PointType;
@@ -29,7 +33,7 @@ public:
 
     void erase(A const &a);
 
-    using iterator = typename std::set<point_type, Comparator>::iterator;
+    using iterator = typename std::set<point_type, FunctionPointsComparator>::iterator;
 
     iterator begin() const noexcept;
 
@@ -54,8 +58,8 @@ private:
 
     void delete_point(const A &a);
 
-    std::set<point_type, Comparator> function_points;
-    std::set<point_type, Comparator> local_maxima;
+    std::set<point_type, FunctionPointsComparator> function_points;
+    std::set<point_type, LocalMaximaComparator> local_maxima;
 };
 
 template<typename A, typename V>
@@ -81,7 +85,7 @@ private:
 };
 
 template<typename A, typename V>
-class FunctionMaxima<A, V>::Comparator {
+class FunctionMaxima<A, V>::FunctionPointsComparator {
 public:
     using is_transparent = std::true_type;
 
@@ -100,13 +104,28 @@ public:
     }
 };
 
+template<typename A, typename V>
+class FunctionMaxima<A, V>::LocalMaximaComparator {
+public:
+    using is_transparent = std::true_type;
+
+    bool operator()(const FunctionMaxima<A, V>::PointType &fk,
+                    const FunctionMaxima<A, V>::PointType &lk) const {
+        if (fk.value() > lk.value() || fk.value() < lk.value()) {
+            return fk.value() > lk.value();
+        }
+
+        return fk.arg() < lk.arg();
+    }
+};
+
 namespace {
     template<typename A>
-    class Guard {
+    class PointConstructionGuard {
     public:
-        Guard(std::shared_ptr<A> *data);
+        PointConstructionGuard(std::shared_ptr<A> *data);
 
-        ~Guard() noexcept;
+        ~PointConstructionGuard() noexcept;
 
         void done() noexcept;
 
@@ -116,17 +135,18 @@ namespace {
     };
 
     template<typename A>
-    Guard<A>::Guard(std::shared_ptr<A> *data) : reverse(true), m_data(data) {}
+    PointConstructionGuard<A>::PointConstructionGuard(std::shared_ptr<A> *data) : reverse(true),
+                                                                                  m_data(data) {}
 
     template<typename A>
-    Guard<A>::~Guard() noexcept {
+    PointConstructionGuard<A>::~PointConstructionGuard() noexcept {
         if (reverse) {
             m_data->reset();
         }
     }
 
     template<typename A>
-    void Guard<A>::done() noexcept {
+    void PointConstructionGuard<A>::done() noexcept {
         reverse = false;
     }
 
@@ -136,6 +156,28 @@ namespace {
         }
     };
 }
+
+template<typename A, typename V>
+class FunctionMaxima<A, V>::PointInsertionGuard {
+public:
+    PointInsertionGuard(iterator it, std::set<point_type, FunctionPointsComparator> *fun_points)
+            : reverse(true), m_it(it), m_function_points(fun_points) {}
+
+    ~PointInsertionGuard() noexcept {
+        if (reverse) {
+            (*m_function_points).erase(m_it);
+        }
+    }
+
+    void done() noexcept {
+        reverse = false;
+    }
+
+private:
+    iterator m_it;
+    std::set<point_type, FunctionPointsComparator> *m_function_points;
+    bool reverse;
+};
 
 template<typename A, typename V>
 typename FunctionMaxima<A, V>::PointType &
@@ -149,7 +191,7 @@ FunctionMaxima<A, V>::PointType::operator=(FunctionMaxima<A, V>::PointType other
 template<typename A, typename V>
 FunctionMaxima<A, V>::PointType::PointType(const A &arg, const V &val) {
     point_argument = std::make_shared<A>(A(arg));
-    Guard<A> point_construction_guard = Guard<A>(&point_argument);
+    PointConstructionGuard<A> point_construction_guard = PointConstructionGuard<A>(&point_argument);
     point_value = std::make_shared<A>(V(val));
     point_construction_guard.done();
 }
@@ -205,8 +247,19 @@ void FunctionMaxima<A, V>::delete_point(const A &a) {
 
 template<typename A, typename V>
 void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
-    delete_point(a);
-    point_type aux = FunctionMaxima<A, V>::point_type(create_point(a, v));
+    point_type new_point = FunctionMaxima<A, V>::point_type(create_point(a, v));
+
+    if (size() == 0) {
+        iterator aux = function_points.insert(aux);
+        PointInsertionGuard(aux, &function_points);
+        local_maxima.insert(*aux);
+    }
+
+    iterator previous_point = find(a);
+    mx_iterator previous_loc_max =
+            (previous_point != function_points.end() ? local_maxima.find(*a) : local_maxima.end());
+
+
     function_points.insert(aux);
 }
 

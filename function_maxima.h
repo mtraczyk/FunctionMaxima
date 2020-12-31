@@ -56,8 +56,6 @@ public:
 private:
     PointType create_point(const A &arg, const V &val);
 
-    void delete_point(const A &a);
-
     std::set<point_type, FunctionPointsComparator> function_points;
     std::set<point_type, LocalMaximaComparator> local_maxima;
 };
@@ -239,33 +237,13 @@ V const &FunctionMaxima<A, V>::value_at(const A &a) const {
 }
 
 template<typename A, typename V>
-void FunctionMaxima<A, V>::delete_point(const A &a) {
-    if (function_points.find(a) != function_points.end()) {
-        function_points.erase(function_points.find(a));
-    }
-}
-
-template<typename A, typename V>
 void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
-    point_type new_point = FunctionMaxima<A, V>::point_type(create_point(a, v));
 
-    if (size() == 0) {
-        iterator aux = function_points.insert(aux);
-        PointInsertionGuard(aux, &function_points);
-        local_maxima.insert(*aux);
-    }
-
-    iterator previous_point = find(a);
-    mx_iterator previous_loc_max =
-            (previous_point != function_points.end() ? local_maxima.find(*a) : local_maxima.end());
-
-
-    function_points.insert(aux);
 }
 
 template<typename A, typename V>
 void FunctionMaxima<A, V>::erase(const A &a) {
-    delete_point(a);
+
 }
 
 template<typename A, typename V>

@@ -59,7 +59,7 @@ public:
 private:
     PointType create_point(const A &arg, const V &val);
 
-    using tpl = typename std::tuple<iterator, bool, bool>;
+    using tpl = typename std::tuple<iterator, bool, bool, mx_iterator>;
 
     void get_info(tpl &p_info, tpl &ln_info, tpl &rn_info, const A &a, const V &v) const;
 
@@ -193,8 +193,8 @@ private:
 template<typename A, typename V>
 class FunctionMaxima<A, V>::LocalMaximaUpdateGuard {
 public:
-    LocalMaximaUpdateGuard(std::set<point_type, LocalMaximaComparator> *fun_points)
-            : reverse(true), m_local_maxima(fun_points),
+    LocalMaximaUpdateGuard(std::set<point_type, LocalMaximaComparator> *loc_maxima)
+            : reverse(true), m_local_maxima(loc_maxima),
               is_point_it_not_null(false), is_ln_it_not_null(false), is_rn_it_not_null(false) {}
 
     ~LocalMaximaUpdateGuard() noexcept {
@@ -307,7 +307,31 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
     tpl point_info, left_neighbour_info, right_neighbour_info;
     get_info(point_info, left_neighbour_info, right_neighbour_info);
 
+    auto new_point = create_point(a, v);
+    auto point_insertion_g = PointInsertionGuard(function_points.insert(new_point),
+                                                 &function_points);
+    auto local_maxima_g = LocalMaximaUpdateGuard(&local_maxima);
 
+    if (point_info.get(2))
+        local_maxima_g.set_point_it(local_maxima.insert(new_point));
+
+    if (!left_neighbour_info.get(1) && left_neighbour_info.get(2))
+        local_maxima_g.set_point_it(local_maxima.insert(*left_neighbour_info.get(0)));
+
+    if (!right_neighbour_info.get(1) && right_neighbour_info.get(2))
+        local_maxima_g.set_point_it(local_maxima.insert(*right_neighbour_info.get(0)));
+
+    if (point_info.get(0) != end())
+        function_points.erase(point_info.get(0));
+
+    if (point_info.get(1))
+        local_maxima.erase(point_info.get(3));
+
+    if (left_neighbour_info.get(1) && !left_neighbour_info.get(2))
+        local_maxima.erase(left_neighbour_info.get(3));
+
+    if (right_neighbour_info.get(1) && !right_neighbour_info.get(2))
+        local_maxima.erase(right_neighbour_info.get(3));
 }
 
 template<typename A, typename V>
@@ -348,7 +372,7 @@ typename FunctionMaxima<A, V>::size_type FunctionMaxima<A, V>::size() const noex
 template<typename A, typename V>
 void FunctionMaxima<A, V>::get_info(tpl &p_info, tpl &ln_info,
                                     tpl &rn_info, const A &a, const V &v) const {
-    p_info = std::make_tuple(end(), false, false);
+    p_info = std::make_tuple(end(), false, false, mx_end());
     ln_info = p_info, rn_info = p_info;
 
     if ((p_info.get(0) = function_points.find(a)) != end()) {
@@ -378,6 +402,10 @@ void FunctionMaxima<A, V>::get_info(tpl &p_info, tpl &ln_info,
     rn_info.get(2) = rn_info.get(0) != end() && !((*rn_info.get(0)).value() < v) &&
                      (++aux.second() == end() ||
                       !((*rn_info.get(0)).value() < (*aux.second()).value()));
+
+    p_info.get(3) = (p_info.get(0) != end() ? local_maxima.find(*p_info.get(0)) : mx_end());
+    ln_info.get(3) = (ln_info.get(0) != end() ? local_maxima.find(*ln_info.get(0)) : mx_end());
+    rn_info.get(3) = (rn_info.get(0) != end() ? local_maxima.find(*rn_info.get(0)) : mx_end());
 }
 
 template<typename A, typename V>

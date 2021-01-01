@@ -322,7 +322,7 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
         local_maxima_g.set_point_it(
                 std::get<0>(local_maxima.insert(*std::get<0>(left_neighbour_info))));
 
-    if (!std::get<1>(right_neighbour_info) && std::get<1>(right_neighbour_info))
+    if (!std::get<1>(right_neighbour_info) && std::get<2>(right_neighbour_info))
         local_maxima_g.set_point_it(
                 std::get<0>(local_maxima.insert(*std::get<0>(right_neighbour_info))));
 
@@ -391,10 +391,12 @@ void FunctionMaxima<A, V>::get_info(tpl &p_info, tpl &ln_info,
             std::get<0>(rn_info) = ++std::get<1>(aux);
         }
     } else {
-        auto new_point = create_point(a, v);
-        auto aux = function_points.upper_bound(new_point);
-        std::get<0>(rn_info) = aux;
-        std::get<0>(ln_info) = ((aux != end() && aux != begin()) ? --aux : end());
+        if (size() != 0) {
+            auto new_point = create_point(a, v);
+            auto aux = function_points.lower_bound(new_point);
+            std::get<0>(rn_info) = aux;
+            std::get<0>(ln_info) = (aux != begin() ? --aux : end());
+        }
     }
 
     std::get<1>(p_info) = (std::get<0>(p_info) != end() &&

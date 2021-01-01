@@ -337,6 +337,9 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
 
     if (std::get<1>(right_neighbour_info) && !std::get<2>(right_neighbour_info))
         local_maxima.erase(std::get<3>(right_neighbour_info));
+
+    point_insertion_g.done();
+    local_maxima_g.done();
 }
 
 template<typename A, typename V>

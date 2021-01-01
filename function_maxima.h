@@ -57,7 +57,7 @@ public:
     ~FunctionMaxima();
 
 private:
-    PointType create_point(const A &arg, const V &val);
+    PointType create_point(const A &arg, const V &val) const;
 
     using tpl = typename std::tuple<iterator, bool, bool, mx_iterator>;
 
@@ -85,7 +85,7 @@ public:
 private:
     PointType(const A &arg, const V &val);
 
-    friend PointType FunctionMaxima::create_point(const A &arg, const V &val);
+    friend PointType FunctionMaxima::create_point(const A &arg, const V &val) const;
 
     std::shared_ptr<A> point_argument;
     std::shared_ptr<V> point_value;
@@ -171,7 +171,8 @@ namespace {
 template<typename A, typename V>
 class FunctionMaxima<A, V>::PointInsertionGuard {
 public:
-    PointInsertionGuard(iterator it, std::set<point_type, FunctionPointsComparator> *fun_points)
+    PointInsertionGuard(const iterator &it,
+                        std::set<point_type, FunctionPointsComparator> *fun_points)
             : reverse(true), m_it(it), m_function_points(fun_points) {}
 
     ~PointInsertionGuard() noexcept {
@@ -185,7 +186,7 @@ public:
     }
 
 private:
-    iterator m_it;
+    const iterator m_it;
     std::set<point_type, FunctionPointsComparator> *m_function_points;
     bool reverse;
 };
@@ -267,7 +268,7 @@ V const &FunctionMaxima<A, V>::PointType::value() const noexcept {
 
 template<typename A, typename V>
 typename FunctionMaxima<A, V>::PointType
-FunctionMaxima<A, V>::create_point(const A &arg, const V &val) {
+FunctionMaxima<A, V>::create_point(const A &arg, const V &val) const {
     return typename FunctionMaxima<A, V>::PointType::PointType(arg, val);
 }
 
@@ -305,10 +306,12 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
         return;
 
     tpl point_info, left_neighbour_info, right_neighbour_info;
-    get_info(point_info, left_neighbour_info, right_neighbour_info);
+    get_info(point_info, left_neighbour_info, right_neighbour_info, a, v);
 
     auto new_point = create_point(a, v);
-    auto point_insertion_g = PointInsertionGuard(function_points.insert(new_point),
+    auto aux = function_points.insert(new_point);
+
+    /*auto point_insertion_g = PointInsertionGuard((function_points.insert(new_point)).first(),
                                                  &function_points);
     auto local_maxima_g = LocalMaximaUpdateGuard(&local_maxima);
 
@@ -332,6 +335,8 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
 
     if (right_neighbour_info.get(1) && !right_neighbour_info.get(2))
         local_maxima.erase(right_neighbour_info.get(3));
+
+        */
 }
 
 template<typename A, typename V>
@@ -375,37 +380,48 @@ void FunctionMaxima<A, V>::get_info(tpl &p_info, tpl &ln_info,
     p_info = std::make_tuple(end(), false, false, mx_end());
     ln_info = p_info, rn_info = p_info;
 
-    if ((p_info.get(0) = function_points.find(a)) != end()) {
-        auto aux = {p_info.get(0), p_info.get(0)};
-        ln_info.get(0) = (p_info.get(0) != begin() ? --aux.first() : end());
-        rn_info.get(0) = ++aux.second();
+    if ((std::get<0>(p_info) = function_points.find(a)) != end()) {
+        std::tuple<iterator, iterator> aux = std::make_tuple(std::get<0>(p_info),
+                                                             std::get<0>(p_info));
+        if (size() != 0) {
+            std::get<0>(ln_info) = (std::get<0>(p_info) != begin() ? --std::get<0>(aux) : end());
+            std::get<0>(rn_info) = ++std::get<1>(aux);
+        }
     } else {
-        auto aux = function_points.upper_bound(create_point(a, v));
-        rn_info.get(0) = aux;
-        ln_info.get(0) = ((aux != end() && aux != begin()) ? --aux : end());
+        auto new_point = create_point(a, v);
+        auto aux = function_points.upper_bound(new_point);
+        std::get<0>(rn_info) = aux;
+        std::get<0>(ln_info) = ((aux != end() && aux != begin()) ? --aux : end());
     }
 
-    p_info.get(1) = (p_info.get(0) != end() && local_maxima.find(*p_info.get(0)) != mx_end());
-    ln_info.get(1) = (ln_info.get(0) != end() &&
-                      local_maxima.find(*ln_info.get(0)) != mx_end());
-    rn_info.get(1) = (rn_info.get(0) != end() &&
-                      local_maxima.find(*rn_info.get(0)) != mx_end());
-    p_info.get(2) = (ln_info.get(0) == end() || !((*ln_info.get(0)).value() > v)) &&
-                    (rn_info.get(0) == end() || !((*rn_info.get(0)).value() > v));
+    std::get<1>(p_info) = (std::get<0>(p_info) != end() &&
+                           local_maxima.find(*std::get<0>(p_info)) != mx_end());
+    std::get<1>(ln_info) = (std::get<0>(ln_info) != end() &&
+                            local_maxima.find(*std::get<0>(ln_info)) != mx_end());
+    std::get<1>(rn_info) = (std::get<0>(rn_info) != end() &&
+                            local_maxima.find(*std::get<0>(rn_info)) != mx_end());
+    std::get<2>(p_info) =
+            (std::get<0>(ln_info) == end() || !((*std::get<0>(ln_info)).value() > v)) &&
+            (std::get<0>(rn_info) == end() || !((*std::get<0>(rn_info)).value() > v));
 
-    auto aux = {ln_info.get(0), rn_info.get(0)};
-    ln_info.get(2) = ln_info.get(0) != end() && (ln_info.get(0) == begin()
-                                                 || !((*ln_info.get(0)).value() <
-                                                      (*(--aux.first())).value()))
-                     && !((*ln_info.get(0)).value() < v);
+    std::tuple<iterator, iterator> aux = std::make_tuple(std::get<0>(ln_info),
+                                                         std::get<0>(rn_info));
+    std::get<2>(ln_info) = std::get<0>(ln_info) != end() && (std::get<0>(ln_info) == begin()
+                                                             || !((*std::get<0>(ln_info)).value() <
+                                                                  (*(--std::get<0>(aux))).value()))
+                           && !((*std::get<0>(ln_info)).value() < v);
 
-    rn_info.get(2) = rn_info.get(0) != end() && !((*rn_info.get(0)).value() < v) &&
-                     (++aux.second() == end() ||
-                      !((*rn_info.get(0)).value() < (*aux.second()).value()));
+    std::get<2>(rn_info) =
+            std::get<0>(rn_info) != end() && !((*std::get<0>(rn_info)).value() < v) &&
+            (++std::get<1>(aux) == end() ||
+             !((*std::get<0>(rn_info)).value() < (*std::get<1>(aux)).value()));
 
-    p_info.get(3) = (p_info.get(0) != end() ? local_maxima.find(*p_info.get(0)) : mx_end());
-    ln_info.get(3) = (ln_info.get(0) != end() ? local_maxima.find(*ln_info.get(0)) : mx_end());
-    rn_info.get(3) = (rn_info.get(0) != end() ? local_maxima.find(*rn_info.get(0)) : mx_end());
+    std::get<3>(p_info) = (std::get<0>(p_info) != end() ? local_maxima.find(*std::get<0>(p_info))
+                                                        : mx_end());
+    std::get<3>(ln_info) = (std::get<0>(ln_info) != end() ? local_maxima.find(*std::get<0>(ln_info))
+                                                          : mx_end());
+    std::get<3>(rn_info) = (std::get<0>(rn_info) != end() ? local_maxima.find(*std::get<0>(rn_info))
+                                                          : mx_end());
 }
 
 template<typename A, typename V>

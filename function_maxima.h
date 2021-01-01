@@ -6,6 +6,7 @@
 #include <iostream>
 #include <exception>
 #include <type_traits>
+#include <tuple>
 
 template<typename A, typename V>
 class FunctionMaxima {
@@ -15,6 +16,8 @@ private:
     class LocalMaximaComparator;
 
     class PointInsertionGuard;
+
+    class LocalMaximaUpdateGuard;
 
 public:
     class PointType;
@@ -55,6 +58,12 @@ public:
 
 private:
     PointType create_point(const A &arg, const V &val);
+
+    using tpl = typename std::tuple<iterator, bool, bool>;
+
+    void get_info(tpl &p_info, tpl &ln_info, tpl &rn_info, const A &a, const V &v) const;
+
+    bool check_whether_the_same(const A &a, const V &v) const;
 
     std::set<point_type, FunctionPointsComparator> function_points;
     std::set<point_type, LocalMaximaComparator> local_maxima;
@@ -98,7 +107,11 @@ public:
 
     bool operator()(const FunctionMaxima<A, V>::PointType &fk,
                     const FunctionMaxima<A, V>::PointType &lk) const {
-        return fk.arg() < lk.arg();
+        if (fk.arg() > lk.arg() || fk.arg() < lk.arg()) {
+            return fk.arg() < lk.arg();
+        }
+
+        return fk.value() < lk.value();
     }
 };
 
@@ -178,6 +191,54 @@ private:
 };
 
 template<typename A, typename V>
+class FunctionMaxima<A, V>::LocalMaximaUpdateGuard {
+public:
+    LocalMaximaUpdateGuard(std::set<point_type, LocalMaximaComparator> *fun_points)
+            : reverse(true), m_local_maxima(fun_points),
+              is_point_it_not_null(false), is_ln_it_not_null(false), is_rn_it_not_null(false) {}
+
+    ~LocalMaximaUpdateGuard() noexcept {
+        if (reverse) {
+            if (is_point_it_not_null) {
+                (*m_local_maxima).erase(point_it);
+            }
+
+            if (is_ln_it_not_null) {
+                (*m_local_maxima).erase(ln_it);
+            }
+
+            if (is_rn_it_not_null) {
+                (*m_local_maxima).erase(rn_it);
+            }
+        }
+    }
+
+    void set_point_it(mx_iterator it) noexcept {
+        point_it = it;
+        is_point_it_not_null = true;
+    }
+
+    void set_ln_it(mx_iterator it) noexcept {
+        ln_it = it;
+        is_ln_it_not_null = true;
+    }
+
+    void set_rn_it(mx_iterator it) noexcept {
+        rn_it = it;
+        is_rn_it_not_null = true;
+    }
+
+    void done() noexcept {
+        reverse = false;
+    }
+
+private:
+    mx_iterator point_it, ln_it, rn_it;
+    std::set<point_type, LocalMaximaComparator> *m_local_maxima;
+    bool reverse, is_point_it_not_null, is_ln_it_not_null, is_rn_it_not_null;
+};
+
+template<typename A, typename V>
 typename FunctionMaxima<A, V>::PointType &
 FunctionMaxima<A, V>::PointType::operator=(FunctionMaxima<A, V>::PointType other) noexcept {
     point_argument.swap(other.arg());
@@ -236,8 +297,16 @@ V const &FunctionMaxima<A, V>::value_at(const A &a) const {
                                                             : throw InvalidArg();
 }
 
+// JESTEM TUTAJ :) :)
+
 template<typename A, typename V>
 void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
+    if (check_whether_the_same(a, v))
+        return;
+
+    tpl point_info, left_neighbour_info, right_neighbour_info;
+    get_info(point_info, left_neighbour_info, right_neighbour_info);
+
 
 }
 
@@ -274,6 +343,52 @@ typename FunctionMaxima<A, V>::mx_iterator FunctionMaxima<A, V>::mx_end() const 
 template<typename A, typename V>
 typename FunctionMaxima<A, V>::size_type FunctionMaxima<A, V>::size() const noexcept {
     return function_points.size();
+}
+
+template<typename A, typename V>
+void FunctionMaxima<A, V>::get_info(tpl &p_info, tpl &ln_info,
+                                    tpl &rn_info, const A &a, const V &v) const {
+    p_info = std::make_tuple(end(), false, false);
+    ln_info = p_info, rn_info = p_info;
+
+    if ((p_info.get(0) = function_points.find(a)) != end()) {
+        auto aux = {p_info.get(0), p_info.get(0)};
+        ln_info.get(0) = (p_info.get(0) != begin() ? --aux.first() : end());
+        rn_info.get(0) = ++aux.second();
+    } else {
+        auto aux = function_points.upper_bound(create_point(a, v));
+        rn_info.get(0) = aux;
+        ln_info.get(0) = ((aux != end() && aux != begin()) ? --aux : end());
+    }
+
+    p_info.get(1) = (p_info.get(0) != end() && local_maxima.find(*p_info.get(0)) != mx_end());
+    ln_info.get(1) = (ln_info.get(0) != end() &&
+                      local_maxima.find(*ln_info.get(0)) != mx_end());
+    rn_info.get(1) = (rn_info.get(0) != end() &&
+                      local_maxima.find(*rn_info.get(0)) != mx_end());
+    p_info.get(2) = (ln_info.get(0) == end() || !((*ln_info.get(0)).value() > v)) &&
+                    (rn_info.get(0) == end() || !((*rn_info.get(0)).value() > v));
+
+    auto aux = {ln_info.get(0), rn_info.get(0)};
+    ln_info.get(2) = ln_info.get(0) != end() && (ln_info.get(0) == begin()
+                                                 || !((*ln_info.get(0)).value() <
+                                                      (*(--aux.first())).value()))
+                     && !((*ln_info.get(0)).value() < v);
+
+    rn_info.get(2) = rn_info.get(0) != end() && !((*rn_info.get(0)).value() < v) &&
+                     (++aux.second() == end() ||
+                      !((*rn_info.get(0)).value() < (*aux.second()).value()));
+}
+
+template<typename A, typename V>
+bool FunctionMaxima<A, V>::check_whether_the_same(const A &a, const V &v) const {
+    auto aux = function_points.find(a);
+
+    if (aux != end() && !(((*aux).value() > v) || ((*aux).value() < v))) {
+        return true;
+    }
+
+    return false;
 }
 
 #endif // FUNCTION_MAXIMA_H

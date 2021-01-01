@@ -311,32 +311,32 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
     auto new_point = create_point(a, v);
     auto aux = function_points.insert(new_point);
 
-    /*auto point_insertion_g = PointInsertionGuard((function_points.insert(new_point)).first(),
+    auto point_insertion_g = PointInsertionGuard(std::get<0>(function_points.insert(new_point)),
                                                  &function_points);
     auto local_maxima_g = LocalMaximaUpdateGuard(&local_maxima);
 
-    if (point_info.get(2))
-        local_maxima_g.set_point_it(local_maxima.insert(new_point));
+    if (std::get<2>(point_info))
+        local_maxima_g.set_point_it(std::get<0>(local_maxima.insert(new_point)));
 
-    if (!left_neighbour_info.get(1) && left_neighbour_info.get(2))
-        local_maxima_g.set_point_it(local_maxima.insert(*left_neighbour_info.get(0)));
+    if (!std::get<1>(left_neighbour_info) && std::get<2>(left_neighbour_info))
+        local_maxima_g.set_point_it(
+                std::get<0>(local_maxima.insert(*std::get<0>(left_neighbour_info))));
 
-    if (!right_neighbour_info.get(1) && right_neighbour_info.get(2))
-        local_maxima_g.set_point_it(local_maxima.insert(*right_neighbour_info.get(0)));
+    if (!std::get<1>(right_neighbour_info) && std::get<1>(right_neighbour_info))
+        local_maxima_g.set_point_it(
+                std::get<0>(local_maxima.insert(*std::get<0>(right_neighbour_info))));
 
-    if (point_info.get(0) != end())
-        function_points.erase(point_info.get(0));
+    if (std::get<0>(point_info) != end())
+        function_points.erase(std::get<0>(point_info));
 
-    if (point_info.get(1))
-        local_maxima.erase(point_info.get(3));
+    if (std::get<1>(point_info))
+        local_maxima.erase(std::get<3>(point_info));
 
-    if (left_neighbour_info.get(1) && !left_neighbour_info.get(2))
-        local_maxima.erase(left_neighbour_info.get(3));
+    if (std::get<1>(left_neighbour_info) && !std::get<2>(left_neighbour_info))
+        local_maxima.erase(std::get<3>(left_neighbour_info));
 
-    if (right_neighbour_info.get(1) && !right_neighbour_info.get(2))
-        local_maxima.erase(right_neighbour_info.get(3));
-
-        */
+    if (std::get<1>(right_neighbour_info) && !std::get<2>(right_neighbour_info))
+        local_maxima.erase(std::get<3>(right_neighbour_info));
 }
 
 template<typename A, typename V>

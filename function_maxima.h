@@ -11,29 +11,31 @@
 template<typename A, typename V>
 class FunctionMaxima {
 private:
-    class FunctionPointsComparator;
+    class FunctionPointsComparator; // Comparator used for storing function points inside a set.
 
-    class LocalMaximaComparator;
+    class LocalMaximaComparator; // Comparator used for storing local maximas inside a set.
 
-    class PointInsertionGuard;
+    class PointInsertionGuard; // Guard used when inserting a point.
 
-    class LocalMaximaUpdateGuard;
+    class LocalMaximaUpdateGuard; // Guard used when updating set with local maximas.
 
 public:
     class PointType;
 
     using point_type = PointType;
 
-    FunctionMaxima() = default;
+    FunctionMaxima<A, V>() = default;
 
-    FunctionMaxima(const FunctionMaxima<A, V> &other) noexcept = default;
+    FunctionMaxima<A, V>(const FunctionMaxima<A, V> &other) noexcept = default;
 
-    FunctionMaxima<A, V> &operator=(FunctionMaxima<A, V> other);
+    FunctionMaxima<A, V> &operator=(FunctionMaxima<A, V> other) noexcept;
 
     V const &value_at(A const &a) const;
 
+    // Strong exception guarantee.
     void set_value(A const &a, V const &v);
 
+    // Strong exception guarantee.
     void erase(A const &a);
 
     using iterator = typename std::set<point_type, FunctionPointsComparator>::iterator;
@@ -54,30 +56,47 @@ public:
 
     size_type size() const noexcept;
 
-    ~FunctionMaxima();
+    ~FunctionMaxima<A, V>();
 
 private:
+    // Thanks to this function we can create new points even though PointType
+    // constructor is private.
     PointType create_point(const A &arg, const V &val) const;
 
+    /* It is being used in a following way:
+     * - iterator stores the iterator to a point,
+     * - first bool is true only if before updates the point was a local maximum,
+     * - second bool is true only if after updates it is gonna be a local maximum,
+     * - mx_iterator stores the (before updates) mx_iterator
+     * to a point (mx_end() if it is not a local maximum before updates)
+     */
     using tpl = typename std::tuple<iterator, bool, bool, mx_iterator>;
 
+    // Used for obtaining data about points that might change during setting values.
     void get_info_for_set_value(tpl &p_info,
                                 tpl &ln_info, tpl &rn_info, const A &a, const V &v) const;
 
+    // Used for obtaining data about points that might change during erasing values.
     void get_info_for_erase(tpl &p_info,
                             tpl &ln_info, tpl &rn_info);
 
+    // Returns true when there is already a point (a, v) inside function_points, false otherwise.
     bool check_whether_the_same(const A &a, const V &v) const;
 
+    // Used for storing all the points.
     std::set<point_type, FunctionPointsComparator> function_points;
+
+    // Used for storing local maximas.
     std::set<point_type, LocalMaximaComparator> local_maxima;
 };
 
 template<typename A, typename V>
 class FunctionMaxima<A, V>::PointType {
 public:
+    // Copying enabled.
     PointType(const PointType &other) noexcept = default;
 
+    // Assigning enabled.
     PointType &operator=(PointType other) noexcept;
 
     A const &arg() const noexcept;
@@ -87,12 +106,15 @@ public:
     ~PointType();
 
 private:
+    // Creating new points is disabled for interface users.
     PointType(const A &arg, const V &val);
 
-    friend PointType FunctionMaxima::create_point(const A &arg, const V &val) const;
+    // Declared as a friend, because we want to have a possibility
+    // of creating new points inside implementation.
+    friend PointType FunctionMaxima<A, V>::create_point(const A &arg, const V &val) const;
 
-    std::shared_ptr<A> point_argument;
-    std::shared_ptr<V> point_value;
+    std::shared_ptr<A> point_argument; // Copying objects of A might be expensive, therefore usage of shared_ptr.
+    std::shared_ptr<V> point_value; // Copying objects of V might be expensive, therefore usage of shared_ptr.
 };
 
 template<typename A, typename V>
@@ -145,8 +167,8 @@ namespace {
         void done() noexcept;
 
     private:
-        std::shared_ptr<A> *m_data;
         bool reverse;
+        std::shared_ptr<A> *m_data; // It should be a pointer, because we don`t want to increase counter for sharing A.
     };
 
     template<typename A>
@@ -166,7 +188,8 @@ namespace {
     }
 
     class InvalidArg : public std::exception {
-    public :
+    public:
+        // Not declared as virtual on purpose.
         const char *what() const throw() override {
             return "Invalid argument!";
         }
@@ -178,7 +201,7 @@ class FunctionMaxima<A, V>::PointInsertionGuard {
 public:
     PointInsertionGuard(const iterator &it,
                         std::set<point_type, FunctionPointsComparator> *fun_points)
-            : reverse(true), m_it(it), m_function_points(fun_points) {}
+            : m_it(it), reverse(true), m_function_points(fun_points) {}
 
     ~PointInsertionGuard() noexcept {
         if (reverse) {
@@ -192,15 +215,15 @@ public:
 
 private:
     const iterator m_it;
-    std::set<point_type, FunctionPointsComparator> *m_function_points;
     bool reverse;
+    std::set<point_type, FunctionPointsComparator> *m_function_points; // It should be a pointer.
 };
 
 template<typename A, typename V>
 class FunctionMaxima<A, V>::LocalMaximaUpdateGuard {
 public:
     LocalMaximaUpdateGuard(std::set<point_type, LocalMaximaComparator> *loc_maxima)
-            : reverse(true), m_local_maxima(loc_maxima),
+            : m_local_maxima(loc_maxima), reverse(true),
               is_point_it_not_null(false), is_ln_it_not_null(false), is_rn_it_not_null(false) {}
 
     ~LocalMaximaUpdateGuard() noexcept {
@@ -240,25 +263,26 @@ public:
 
 private:
     mx_iterator point_it, ln_it, rn_it;
-    std::set<point_type, LocalMaximaComparator> *m_local_maxima;
+    std::set<point_type, LocalMaximaComparator> *m_local_maxima; // It should be a pointer.
     bool reverse, is_point_it_not_null, is_ln_it_not_null, is_rn_it_not_null;
 };
 
+// Noexcept alignment operator for PointType.
 template<typename A, typename V>
 typename FunctionMaxima<A, V>::PointType &
 FunctionMaxima<A, V>::PointType::operator=(FunctionMaxima<A, V>::PointType other) noexcept {
-    point_argument.swap(other.arg());
-    point_value.swap(other.value());
+    point_argument.swap(other.arg()); // Swap is noexcept!!
+    point_value.swap(other.value()); // Swap is noexcept!!
 
     return *this;
 }
 
 template<typename A, typename V>
 FunctionMaxima<A, V>::PointType::PointType(const A &arg, const V &val) {
-    point_argument = std::make_shared<A>(A(arg));
+    point_argument = std::make_shared<A>(A(arg)); // Copy constructor of A might throw an exception.
     PointConstructionGuard<A> point_construction_guard = PointConstructionGuard<A>(&point_argument);
-    point_value = std::make_shared<A>(V(val));
-    point_construction_guard.done();
+    point_value = std::make_shared<A>(V(val)); // Copy constructor of V might throw an exception.
+    point_construction_guard.done(); // No exception thrown, successful creation of a new point.
 }
 
 template<typename A, typename V>
@@ -274,48 +298,50 @@ V const &FunctionMaxima<A, V>::PointType::value() const noexcept {
 template<typename A, typename V>
 typename FunctionMaxima<A, V>::PointType
 FunctionMaxima<A, V>::create_point(const A &arg, const V &val) const {
+    // This way constructing a new point is possible inside implementation.
     return typename FunctionMaxima<A, V>::PointType::PointType(arg, val);
 }
 
 template<typename A, typename V>
 FunctionMaxima<A, V>::PointType::~PointType() {
+    // Counters decreased.
     point_argument.reset();
     point_value.reset();
 }
 
 template<typename A, typename V>
 FunctionMaxima<A, V>::~FunctionMaxima() {
+    // Containers cleared.
     function_points.clear();
     local_maxima.clear();
 }
 
 template<typename A, typename V>
-FunctionMaxima<A, V> &FunctionMaxima<A, V>::operator=(FunctionMaxima<A, V> other) {
-    function_points.swap(other.function_points);
-    local_maxima.swap(other.local_maxima);
+FunctionMaxima<A, V> &FunctionMaxima<A, V>::operator=(FunctionMaxima<A, V> other) noexcept {
+    function_points.swap(other.function_points); // Swapping sets is noexcept.
+    local_maxima.swap(other.local_maxima); // Swapping sets is noexcept.
 
     return *this;
 }
 
 template<typename A, typename V>
 V const &FunctionMaxima<A, V>::value_at(const A &a) const {
+    // If a does not belong to the domain - InvalidArg is thrown.
     return function_points.find(a) != function_points.end() ? (*function_points.find(a)).value()
                                                             : throw InvalidArg();
 }
 
-// JESTEM TUTAJ :) :)
-
 template<typename A, typename V>
 void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
     if (check_whether_the_same(a, v))
-        return;
+        return; // Nothing changes if we set the same value for a.
 
     using std::get;
+    // Storing info for the points that might change during updates.
     tpl point_info, left_neighbour_info, right_neighbour_info;
     get_info_for_set_value(point_info, left_neighbour_info, right_neighbour_info, a, v);
 
     auto new_point = create_point(a, v);
-    auto aux = function_points.insert(new_point);
 
     auto point_insertion_g = PointInsertionGuard(get<0>(function_points.insert(new_point)),
                                                  &function_points);
@@ -325,10 +351,10 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
         local_maxima_g.set_point_it(get<0>(local_maxima.insert(new_point)));
 
     if (!get<1>(left_neighbour_info) && get<2>(left_neighbour_info))
-        local_maxima_g.set_point_it(get<0>(local_maxima.insert(*get<0>(left_neighbour_info))));
+        local_maxima_g.set_ln_it(get<0>(local_maxima.insert(*get<0>(left_neighbour_info))));
 
     if (!get<1>(right_neighbour_info) && get<2>(right_neighbour_info))
-        local_maxima_g.set_point_it(get<0>(local_maxima.insert(*get<0>(right_neighbour_info))));
+        local_maxima_g.set_rn_it(get<0>(local_maxima.insert(*get<0>(right_neighbour_info))));
 
     if (get<0>(point_info) != end())
         function_points.erase(get<0>(point_info));

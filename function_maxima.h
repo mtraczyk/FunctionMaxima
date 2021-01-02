@@ -111,7 +111,7 @@ public:
 
     bool operator()(const FunctionMaxima<A, V>::PointType &fk,
                     const FunctionMaxima<A, V>::PointType &lk) const {
-        if (fk.arg() > lk.arg() || fk.arg() < lk.arg()) {
+        if (lk.arg() < fk.arg() || fk.arg() < lk.arg()) {
             return fk.arg() < lk.arg();
         }
 
@@ -126,8 +126,8 @@ public:
 
     bool operator()(const FunctionMaxima<A, V>::PointType &fk,
                     const FunctionMaxima<A, V>::PointType &lk) const {
-        if (fk.value() > lk.value() || fk.value() < lk.value()) {
-            return fk.value() > lk.value();
+        if (lk.value() < fk.value() || fk.value() < lk.value()) {
+            return lk.value() < fk.value();
         }
 
         return fk.arg() < lk.arg();
@@ -166,6 +166,7 @@ namespace {
     }
 
     class InvalidArg : public std::exception {
+    public :
         const char *what() const throw() override {
             return "Invalid argument!";
         }
@@ -433,8 +434,8 @@ void FunctionMaxima<A, V>::get_info_for_set_value(tpl &p_info, tpl &ln_info,
     get<1>(p_info) = (get<0>(p_info) != end() && local_maxima.find(*get<0>(p_info)) != mx_end());
     get<1>(ln_info) = (get<0>(ln_info) != end() && local_maxima.find(*get<0>(ln_info)) != mx_end());
     get<1>(rn_info) = (get<0>(rn_info) != end() && local_maxima.find(*get<0>(rn_info)) != mx_end());
-    get<2>(p_info) = (get<0>(ln_info) == end() || !((*get<0>(ln_info)).value() > v))
-                     && (get<0>(rn_info) == end() || !((*get<0>(rn_info)).value() > v));
+    get<2>(p_info) = (get<0>(ln_info) == end() || !((v < (*get<0>(ln_info)).value())))
+                     && (get<0>(rn_info) == end() || !(v < (*get<0>(rn_info)).value()));
 
     std::tuple<iterator, iterator> aux = std::make_tuple(get<0>(ln_info), get<0>(rn_info));
     get<2>(ln_info) = get<0>(ln_info) != end() && (get<0>(ln_info) == begin() ||
@@ -455,7 +456,7 @@ template<typename A, typename V>
 bool FunctionMaxima<A, V>::check_whether_the_same(const A &a, const V &v) const {
     auto aux = function_points.find(a);
 
-    if (aux != end() && !(((*aux).value() > v) || ((*aux).value() < v))) {
+    if (aux != end() && !((v < (*aux).value()) || ((*aux).value() < v))) {
         return true;
     }
 

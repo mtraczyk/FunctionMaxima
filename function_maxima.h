@@ -83,6 +83,13 @@ private:
     // Returns true when there is already a point (a, v) inside function_points, false otherwise.
     bool check_whether_the_same(const A &a, const V &v) const;
 
+    // Auxiliary function for set_value. Uses information gathered in get_info_for_set_value.
+    void set_value_aux(const tpl &p_info, const tpl &ln_info, const tpl &rn_info,
+                       const PointType &new_point);
+
+    // Auxiliary function for erase. Uses information gathered in get_info_for_erase.
+    void erase_aux(const tpl &p_info, const tpl &ln_info, const tpl &rn_info);
+
     // Used for storing all the points.
     std::set<point_type, FunctionPointsComparator> function_points;
 
@@ -336,46 +343,18 @@ void FunctionMaxima<A, V>::set_value(const A &a, const V &v) {
     if (check_whether_the_same(a, v))
         return; // Nothing changes if we set the same value for a.
 
-    using std::get;
     // Storing info for the points that might change during updates.
     tpl point_info, left_neighbour_info, right_neighbour_info;
     get_info_for_set_value(point_info, left_neighbour_info, right_neighbour_info, a, v);
 
     auto new_point = create_point(a, v);
-
-    auto point_insertion_g = PointInsertionGuard(get<0>(function_points.insert(new_point)),
-                                                 &function_points);
-    auto local_maxima_g = LocalMaximaUpdateGuard(&local_maxima);
-
-    if (get<2>(point_info))
-        local_maxima_g.set_point_it(get<0>(local_maxima.insert(new_point)));
-
-    if (!get<1>(left_neighbour_info) && get<2>(left_neighbour_info))
-        local_maxima_g.set_ln_it(get<0>(local_maxima.insert(*get<0>(left_neighbour_info))));
-
-    if (!get<1>(right_neighbour_info) && get<2>(right_neighbour_info))
-        local_maxima_g.set_rn_it(get<0>(local_maxima.insert(*get<0>(right_neighbour_info))));
-
-    if (get<0>(point_info) != end())
-        function_points.erase(get<0>(point_info));
-
-    if (get<1>(point_info))
-        local_maxima.erase(get<3>(point_info));
-
-    if (get<1>(left_neighbour_info) && !get<2>(left_neighbour_info))
-        local_maxima.erase(get<3>(left_neighbour_info));
-
-    if (get<1>(right_neighbour_info) && !get<2>(right_neighbour_info))
-        local_maxima.erase(get<3>(right_neighbour_info));
-
-    point_insertion_g.done();
-    local_maxima_g.done();
+    set_value_aux(point_info, left_neighbour_info, right_neighbour_info, new_point);
 }
 
 template<typename A, typename V>
 void FunctionMaxima<A, V>::erase(const A &a) {
-    tpl point_info, left_neighbour_info, right_neighbour_info;
     using std::get;
+    tpl point_info, left_neighbour_info, right_neighbour_info;
 
     if ((get<0>(point_info) = function_points.find(a)) != end()) {
         get_info_for_erase(point_info, left_neighbour_info, right_neighbour_info);
@@ -383,26 +362,7 @@ void FunctionMaxima<A, V>::erase(const A &a) {
         return;
     }
 
-    auto local_maxima_g = LocalMaximaUpdateGuard(&local_maxima);
-
-    if (!get<1>(left_neighbour_info) && get<2>(left_neighbour_info))
-        local_maxima_g.set_point_it(get<0>(local_maxima.insert(*get<0>(left_neighbour_info))));
-
-    if (!get<1>(right_neighbour_info) && get<2>(right_neighbour_info))
-        local_maxima_g.set_point_it(get<0>(local_maxima.insert(*get<0>(right_neighbour_info))));
-
-    function_points.erase(get<0>(point_info));
-
-    if (get<1>(point_info))
-        local_maxima.erase(get<3>(point_info));
-
-    if (get<1>(left_neighbour_info) && !get<2>(left_neighbour_info))
-        local_maxima.erase(get<3>(left_neighbour_info));
-
-    if (get<1>(right_neighbour_info) && !get<2>(right_neighbour_info))
-        local_maxima.erase(get<3>(right_neighbour_info));
-
-    local_maxima_g.done();
+    erase_aux(point_info, left_neighbour_info, right_neighbour_info);
 }
 
 template<typename A, typename V>
@@ -495,7 +455,6 @@ FunctionMaxima<A, V>::get_info_for_erase(FunctionMaxima<A, V>::tpl &p_info,
                                          FunctionMaxima<A, V>::tpl &ln_info,
                                          FunctionMaxima<A, V>::tpl &rn_info) {
     using std::get;
-
     get<3>(p_info) = local_maxima.find(*get<0>(p_info));
     get<1>(p_info) = get<3>(p_info) != mx_end();
 
@@ -504,7 +463,6 @@ FunctionMaxima<A, V>::get_info_for_erase(FunctionMaxima<A, V>::tpl &p_info,
         get<0>(ln_info) = (get<0>(p_info) != begin() ? --get<0>(aux) : end());
         get<0>(rn_info) = ++get<1>(aux);
     }
-
 
     get<3>(ln_info) = (get<0>(ln_info) != end() ? local_maxima.find(*get<0>(ln_info)) : mx_end());
     get<3>(rn_info) = (get<0>(rn_info) != end() ? local_maxima.find(*get<0>(rn_info)) : mx_end());
@@ -523,6 +481,68 @@ FunctionMaxima<A, V>::get_info_for_erase(FunctionMaxima<A, V>::tpl &p_info,
                                                      (*get<0>(ln_info)).value())) &&
                       (++get<1>(aux) == end() ||
                        !((*get<0>(rn_info)).value() < (*get<1>(aux)).value()));
+}
+
+template<typename A, typename V>
+void FunctionMaxima<A, V>::erase_aux(const FunctionMaxima::tpl &p_info,
+                                     const FunctionMaxima::tpl &ln_info,
+                                     const FunctionMaxima::tpl &rn_info) {
+    using std::get;
+    auto local_maxima_g = LocalMaximaUpdateGuard(&local_maxima);
+
+    if (!get<1>(ln_info) && get<2>(ln_info))
+        local_maxima_g.set_point_it(get<0>(local_maxima.insert(*get<0>(ln_info))));
+
+    if (!get<1>(rn_info) && get<2>(rn_info))
+        local_maxima_g.set_point_it(get<0>(local_maxima.insert(*get<0>(rn_info))));
+
+    function_points.erase(get<0>(p_info));
+
+    if (get<1>(p_info))
+        local_maxima.erase(get<3>(p_info));
+
+    if (get<1>(ln_info) && !get<2>(ln_info))
+        local_maxima.erase(get<3>(ln_info));
+
+    if (get<1>(rn_info) && !get<2>(rn_info))
+        local_maxima.erase(get<3>(rn_info));
+
+    local_maxima_g.done();
+}
+
+template<typename A, typename V>
+void FunctionMaxima<A, V>::set_value_aux(const FunctionMaxima<A, V>::tpl &p_info,
+                                         const FunctionMaxima<A, V>::tpl &ln_info,
+                                         const FunctionMaxima<A, V>::tpl &rn_info,
+                                         const FunctionMaxima<A, V>::PointType &new_point) {
+    using std::get;
+    auto point_insertion_g = PointInsertionGuard(get<0>(function_points.insert(new_point)),
+                                                 &function_points);
+    auto local_maxima_g = LocalMaximaUpdateGuard(&local_maxima);
+
+    if (get<2>(p_info))
+        local_maxima_g.set_point_it(get<0>(local_maxima.insert(new_point)));
+
+    if (!get<1>(ln_info) && get<2>(ln_info))
+        local_maxima_g.set_ln_it(get<0>(local_maxima.insert(*get<0>(ln_info))));
+
+    if (!get<1>(rn_info) && get<2>(rn_info))
+        local_maxima_g.set_rn_it(get<0>(local_maxima.insert(*get<0>(rn_info))));
+
+    if (get<0>(p_info) != end())
+        function_points.erase(get<0>(p_info));
+
+    if (get<1>(p_info))
+        local_maxima.erase(get<3>(p_info));
+
+    if (get<1>(ln_info) && !get<2>(ln_info))
+        local_maxima.erase(get<3>(ln_info));
+
+    if (get<1>(rn_info) && !get<2>(rn_info))
+        local_maxima.erase(get<3>(rn_info));
+
+    point_insertion_g.done();
+    local_maxima_g.done();
 }
 
 #endif // FUNCTION_MAXIMA_H

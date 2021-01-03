@@ -26,7 +26,7 @@ public:
 
     FunctionMaxima<A, V>() = default;
 
-    FunctionMaxima<A, V>(const FunctionMaxima<A, V> &other) noexcept = default;
+    FunctionMaxima<A, V>(const FunctionMaxima<A, V> &other) = default;
 
     FunctionMaxima<A, V> &operator=(FunctionMaxima<A, V> other) noexcept;
 
@@ -334,8 +334,9 @@ FunctionMaxima<A, V> &FunctionMaxima<A, V>::operator=(FunctionMaxima<A, V> other
 template<typename A, typename V>
 V const &FunctionMaxima<A, V>::value_at(const A &a) const {
     // If a does not belong to the domain - InvalidArg is thrown.
-    return function_points.find(a) != function_points.end() ? (*function_points.find(a)).value()
-                                                            : throw InvalidArg();
+    if(function_points.find(a) != function_points.end())
+        return (*function_points.find(a)).value();
+    throw InvalidArg();
 }
 
 template<typename A, typename V>

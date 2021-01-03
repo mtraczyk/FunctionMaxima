@@ -28,6 +28,8 @@ public:
 
     FunctionMaxima<A, V>(const FunctionMaxima<A, V> &other) = default;
 
+    FunctionMaxima<A, V>(FunctionMaxima<A, V> &&other) = default;
+
     FunctionMaxima<A, V> &operator=(FunctionMaxima<A, V> other) noexcept;
 
     V const &value_at(A const &a) const;
@@ -56,7 +58,7 @@ public:
 
     size_type size() const noexcept;
 
-    ~FunctionMaxima<A, V>();
+    ~FunctionMaxima<A, V>() noexcept;
 
 private:
     // Thanks to this function we can create new points even though PointType
@@ -110,7 +112,7 @@ public:
 
     V const &value() const noexcept;
 
-    ~PointType();
+    ~PointType() noexcept;
 
 private:
     // Creating new points is disabled for interface users.
@@ -310,14 +312,14 @@ FunctionMaxima<A, V>::create_point(const A &arg, const V &val) const {
 }
 
 template<typename A, typename V>
-FunctionMaxima<A, V>::PointType::~PointType() {
+FunctionMaxima<A, V>::PointType::~PointType() noexcept {
     // Counters decreased.
     point_argument.reset();
     point_value.reset();
 }
 
 template<typename A, typename V>
-FunctionMaxima<A, V>::~FunctionMaxima() {
+FunctionMaxima<A, V>::~FunctionMaxima() noexcept {
     // Containers cleared.
     function_points.clear();
     local_maxima.clear();
@@ -334,7 +336,7 @@ FunctionMaxima<A, V> &FunctionMaxima<A, V>::operator=(FunctionMaxima<A, V> other
 template<typename A, typename V>
 V const &FunctionMaxima<A, V>::value_at(const A &a) const {
     // If a does not belong to the domain - InvalidArg is thrown.
-    if(function_points.find(a) != function_points.end())
+    if (function_points.find(a) != function_points.end())
         return (*function_points.find(a)).value();
     throw InvalidArg();
 }

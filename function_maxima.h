@@ -507,7 +507,7 @@ template<typename A, typename V>
 FunctionMaxima<A, V>::PointType::PointType(const A &arg, const V &val) {
     point_argument = std::make_shared<A>(A(arg)); // Copy constructor of A might throw an exception.
     auto point_construction_guard = PointConstructionGuard(&point_argument);
-    point_value = std::make_shared<A>(V(val)); // Copy constructor of V might throw an exception.
+    point_value = std::make_shared<V>(V(val)); // Copy constructor of V might throw an exception.
     point_construction_guard.done(); // No exception thrown, successful creation of a new point.
 }
 

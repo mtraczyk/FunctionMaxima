@@ -1,4 +1,4 @@
-# jnp1FifthTask
+# exception safe C++ programming
 This project shows usage of different programming techniques in order to guarantee
 strong/noexcept exception safety.
 For instance, I used RAII to guarantee atomicity of operations on data structures such as sets.
